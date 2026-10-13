@@ -3947,6 +3947,29 @@ sc delete {app_name}
 )
 }
 
+// Modified: per-user autostart (HKCU Run) for non-elevated agents — no UAC required.
+pub fn set_autostart_run_key() -> ResultType<()> {
+    let exe = std::env::current_exe()?.to_string_lossy().to_string();
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let key =
+        hkcu.open_subkey_with_flags(r"Software\Microsoft\Windows\CurrentVersion\Run", KEY_SET_VALUE)?;
+    key.set_value(
+        format!("{} Agent", crate::get_app_name()),
+        &format!("\"{}\" --server", exe),
+    )?;
+    log::info!("autostart run key registered for {}", exe);
+    Ok(())
+}
+
+pub fn remove_autostart_run_key() {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok(key) =
+        hkcu.open_subkey_with_flags(r"Software\Microsoft\Windows\CurrentVersion\Run", KEY_SET_VALUE)
+    {
+        let _ = key.delete_value(format!("{} Agent", crate::get_app_name()));
+    }
+}
+
 fn get_create_service(exe: &str) -> String {
     if config::is_outgoing_only() {
         return "".to_string();

