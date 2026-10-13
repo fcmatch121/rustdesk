@@ -14,6 +14,14 @@ on:
           - all
           - windows-x86_64
         default: all
+      custom-server:
+        description: "Custom rendezvous server (IP/domain) to bake into the agent"
+        type: string
+        default: ""
+      custom-pub-key:
+        description: "Custom server public key to bake into the agent"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -26,3 +34,5 @@ jobs:
       upload-artifact: true
       upload-tag: "nightly"
       build-scope: ${{ inputs.build-scope || 'all' }}
+      custom-server: ${{ inputs.custom-server || '' }}
+      custom-pub-key: ${{ inputs.custom-pub-key || '' }}
