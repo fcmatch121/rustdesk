@@ -12,6 +12,10 @@ on:
       publish-update-metadata:
         type: boolean
         default: false
+      # Modified: allow dispatching a light iteration build (windows-x86_64 only)
+      build-scope:
+        type: string
+        default: "all"
 
 # NOTE: F-Droid builder script 'flutter/build_fdroid.sh' reads environment
 # variables from this workflow!
@@ -129,6 +133,7 @@ jobs:
 
   build-RustDeskTempTopMostWindow:
     needs: [validate-update-metadata-keys]
+    if: ${{ inputs.build-scope != 'windows-x86_64' || matrix.job.platform != 'ARM64' }}
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
     strategy:
       fail-fast: false
@@ -152,6 +157,7 @@ jobs:
   build-for-windows-flutter:
     name: ${{ matrix.job.target }}
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
+    if: ${{ inputs.build-scope != 'windows-x86_64' || matrix.job.arch != 'aarch64' }}
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
@@ -535,6 +541,7 @@ jobs:
   build-for-windows-sciter:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     needs: [validate-update-metadata-keys]
+    if: ${{ inputs.build-scope != 'windows-x86_64' }}
     runs-on: ${{ matrix.job.os }}
     # Temporarily disable this action due to additional test is needed.
     # if: false
@@ -714,7 +721,7 @@ jobs:
             ./SignOutput/rustdesk-*.exe
 
   build-rustdesk-ios:
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && inputs.build-scope == 'all' }}
     name: build rustdesk ios ipa
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
@@ -1236,7 +1243,7 @@ jobs:
       - build-for-windows-flutter
       - build-for-windows-sciter
     runs-on: ubuntu-latest
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && inputs.build-scope == 'all' }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1294,6 +1301,7 @@ jobs:
   build-rustdesk-android:
     needs: [generate-bridge]
     name: build rustdesk android apk ${{ matrix.job.target }}
+    if: ${{ inputs.build-scope == 'all' }}
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
@@ -1587,7 +1595,7 @@ jobs:
   build-rustdesk-android-universal:
     needs: [build-rustdesk-android]
     name: build rustdesk android universal apk
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && inputs.build-scope == 'all' }}
     runs-on: ubuntu-24.04
     env:
       reltype: release
@@ -1772,6 +1780,7 @@ jobs:
   build-rustdesk-linux:
     needs: [generate-bridge]
     name: build rustdesk linux ${{ matrix.job.target }}
+    if: ${{ inputs.build-scope == 'all' }}
     runs-on: ${{ matrix.job.on }}
     strategy:
       fail-fast: false
@@ -2121,6 +2130,7 @@ jobs:
   build-rustdesk-linux-drm:
     needs: [generate-bridge]
     name: build rustdesk linux drm x86_64
+    if: ${{ inputs.build-scope == 'all' }}
     runs-on: ubuntu-22.04
     steps:
       - name: Export GitHub Actions cache environment variables
@@ -2429,7 +2439,7 @@ jobs:
           path: ${{ env.DRM_DEB }}
 
   build-rustdesk-linux-sciter:
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && inputs.build-scope == 'all' }}
     needs: [validate-update-metadata-keys]
     runs-on: ${{ matrix.job.on }}
     name: build-rustdesk-linux-sciter ${{ matrix.job.target }}
@@ -2675,7 +2685,7 @@ jobs:
     name: Build appimage ${{ matrix.job.target }}
     needs: [build-rustdesk-linux]
     runs-on: ubuntu-22.04
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && inputs.build-scope == 'all' }}
     strategy:
       fail-fast: false
       matrix:
@@ -2730,7 +2740,7 @@ jobs:
       - build-rustdesk-linux
       - build-rustdesk-linux-sciter
     runs-on: ${{ matrix.job.on }}
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.upload-artifact && inputs.build-scope == 'all' }}
     strategy:
       fail-fast: false
       matrix:

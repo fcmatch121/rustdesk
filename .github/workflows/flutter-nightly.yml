@@ -5,6 +5,15 @@ on:
     # schedule build every night
     - cron: "0 0 * * *"
   workflow_dispatch:
+    # Modified: allow a light iteration build (windows-x86_64 only) during development
+    inputs:
+      build-scope:
+        description: "Build scope (all = every platform, windows-x86_64 = quick iteration build)"
+        type: choice
+        options:
+          - all
+          - windows-x86_64
+        default: all
 
 permissions:
   contents: write
@@ -16,3 +25,4 @@ jobs:
     with:
       upload-artifact: true
       upload-tag: "nightly"
+      build-scope: ${{ inputs.build-scope || 'all' }}
