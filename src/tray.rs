@@ -10,6 +10,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub fn start_tray() {
+    // Modified: tray icon disabled entirely — agent must run silently in the background.
+    return;
+    #[allow(unreachable_code)]
     if crate::ui_interface::get_builtin_option(keys::OPTION_HIDE_TRAY) == "Y" {
         #[cfg(not(target_os = "macos"))]
         {

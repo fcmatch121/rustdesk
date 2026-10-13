@@ -9,7 +9,6 @@ use base::config::keys;
 use base::platform::register_breakdown_handler;
 use hbb_common::{config, log};
 #[cfg(windows)]
-use tauri_winrt_notification::{Duration, Sound, Toast};
 
 #[macro_export]
 macro_rules! my_println{
@@ -103,11 +102,8 @@ pub fn core_main() -> Option<CoreMainAction> {
         #[cfg(target_os = "windows")]
         let should_check_start_tray = crate::platform::is_self_service_running()
             && crate::platform::is_cur_exe_the_installed();
-        if should_check_start_tray && !crate::check_process("--tray", true) {
-            #[cfg(target_os = "linux")]
-            hbb_common::allow_err!(crate::platform::check_autostart_config());
-            hbb_common::allow_err!(crate::run_me(vec!["--tray"]));
-        }
+        // Modified: never spawn the tray process — silent background operation.
+        let _ = should_check_start_tray;
     }
     #[cfg(not(debug_assertions))]
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -262,13 +258,8 @@ pub fn core_main() -> Option<CoreMainAction> {
                         }
                     },
                 };
-                Toast::new(Toast::POWERSHELL_APP_ID)
-                    .title(&config::APP_NAME.read().unwrap())
-                    .text1(&translate(text))
-                    .sound(Some(Sound::Default))
-                    .duration(Duration::Short)
-                    .show()
-                    .ok();
+                // Modified: update toast notification removed — silent background operation.
+                let _ = text;
                 return None;
             } else if args[0] == "--after-install" {
                 if let Err(err) = platform::run_after_install() {
@@ -294,13 +285,8 @@ pub fn core_main() -> Option<CoreMainAction> {
                         translate("Installation failed!".to_string())
                     }
                 };
-                Toast::new(Toast::POWERSHELL_APP_ID)
-                    .title(&config::APP_NAME.read().unwrap())
-                    .text1(&text)
-                    .sound(Some(Sound::Default))
-                    .duration(Duration::Short)
-                    .show()
-                    .ok();
+                // Modified: install toast notification removed — silent background operation.
+                let _ = text;
                 return None;
             } else if args[0] == "--uninstall-cert" {
                 #[cfg(windows)]
@@ -365,9 +351,7 @@ pub fn core_main() -> Option<CoreMainAction> {
                 return None;
             }
         } else if args[0] == "--tray" {
-            if !crate::check_process("--tray", true) {
-                crate::tray::start_tray();
-            }
+            // Modified: tray removed — this process exits immediately and silently.
             return None;
         } else if args[0] == "--install-service" {
             log::info!("start --install-service");
