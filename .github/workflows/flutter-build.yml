@@ -545,6 +545,108 @@ jobs:
             ./SignOutput/rustdesk-*.exe
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
+  build-windows-single-binary:
+    # Modified: one self-contained rustdesk.exe — no Flutter runtime, no
+    # flutter_windows.dll, no data/ folder, no sciter.dll (silent agent never
+    # starts a UI, so the runtime-loaded sciter.dll is never needed).
+    name: windows-x86_64-single-binary
+    needs: [validate-update-metadata-keys]
+    runs-on: windows-2022
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows-static
+    steps:
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+
+      # Modified: bake a custom rendezvous server / public key into the client binary
+      - name: Bake custom server into hbb_common config
+        if: ${{ inputs.custom-server != '' }}
+        env:
+          CUSTOM_SERVER: ${{ inputs.custom-server }}
+          CUSTOM_PUB_KEY: ${{ inputs.custom-pub-key }}
+        run: |
+          import os, re, pathlib
+          p = pathlib.Path('libs/hbb_common/src/config.rs')
+          s = p.read_text(encoding='utf-8')
+          server = os.environ['CUSTOM_SERVER']
+          key = os.environ.get('CUSTOM_PUB_KEY', '')
+          s = re.sub(r'pub const RENDEZVOUS_SERVERS: &\[&str\] = &[^\n]+;',
+                     'pub const RENDEZVOUS_SERVERS: &[&str] = &["%s"];' % server, s)
+          if key:
+              s = re.sub(r'pub const RS_PUB_KEY: &str = "[^"]*";',
+                         'pub const RS_PUB_KEY: &str = "%s";' % key, s)
+          p.write_text(s, encoding='utf-8')
+          print('baked server:', server, '| key set:', bool(key))
+        shell: python
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0 # v2.0.9
+        with:
+          version: ${{ env.LLVM_VERSION }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: ${{ env.SCITER_RUST_VERSION }}
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          prefix-key: windows-single-x64
+
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      # scrap needs exactly these three; ffmpeg is only for hwcodec/vram, which
+      # the single binary does not use.
+      - name: Install vcpkg dependencies (libyuv, libvpx, aom)
+        run: |
+          $VCPKG_ROOT/vcpkg install libyuv libvpx aom \
+            --triplet x64-windows-static \
+            --x-install-root="$VCPKG_ROOT/installed"
+        shell: bash
+
+      - name: Build single rustdesk.exe (no Flutter)
+        shell: bash
+        run: |
+          python3 res/inline-sciter.py
+          cargo build --locked --features inline --release --bin rustdesk --target x86_64-pc-windows-msvc
+          mkdir -p ./single
+          cp target/x86_64-pc-windows-msvc/release/rustdesk.exe ./single/rustdesk-agent.exe
+          ls -l ./single/rustdesk-agent.exe
+
+      - name: Verify single binary version
+        shell: powershell
+        run: |
+          $reportedVersion = (& ".\single\rustdesk-agent.exe" --version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "rustdesk --version exited with $LASTEXITCODE"
+          }
+          if ($reportedVersion -cne $env:VERSION) {
+            throw "RustDesk reports version '$reportedVersion', expected '$env:VERSION'"
+          }
+
+      - name: Upload single-binary artifact
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rustdesk-agent-single-x86_64
+          path: ./single/rustdesk-agent.exe
+          if-no-files-found: error
+
   build-for-windows-sciter:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     needs: [validate-update-metadata-keys]
