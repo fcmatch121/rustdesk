@@ -610,13 +610,22 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
-      # scrap needs exactly these three; ffmpeg is only for hwcodec/vram, which
-      # the single binary does not use.
-      - name: Install vcpkg dependencies (libyuv, libvpx, aom)
+      # Manifest-mode install (repo root vcpkg.json): package args are rejected
+      # in manifest mode — same invocation as the proven sciter job. Installs
+      # libyuv/libvpx/aom (plus manifest deps) for the static triplet.
+      - name: Install vcpkg dependencies
         run: |
-          $VCPKG_ROOT/vcpkg install libyuv libvpx aom \
+          if ! $VCPKG_ROOT/vcpkg install \
             --triplet x64-windows-static \
-            --x-install-root="$VCPKG_ROOT/installed"
+            --x-install-root="$VCPKG_ROOT/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
+              echo "$_1:"
+              echo "======"
+              cat "$_1"
+              echo "======"
+            done
+            exit 1
+          fi
         shell: bash
 
       - name: Build single rustdesk.exe (no Flutter)
