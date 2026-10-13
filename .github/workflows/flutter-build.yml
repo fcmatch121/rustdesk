@@ -825,6 +825,7 @@ jobs:
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
+    if: ${{ inputs.build-scope != 'windows-x86_64' }}
     strategy:
       fail-fast: false
       matrix:
