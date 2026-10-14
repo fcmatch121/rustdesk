@@ -199,8 +199,17 @@ jobs:
           if key:
               s = re.sub(r'pub const RS_PUB_KEY: &str = "[^"]*";',
                          'pub const RS_PUB_KEY: &str = "%s";' % key, s)
+          # Random per-install device id instead of MAC-derived (prevents
+          # duplicate IDs on machines that report an identical MAC, e.g. VM
+          # clones / identical virtual adapters). The id is generated once and
+          # stored in the local config, same lifetime as the MAC-derived one.
+          s = re.sub(r'let mut id = 0u32;.*?\} else \{\n                None\n            \}',
+                     'let id = rand::thread_rng().gen_range(100_000_000..1_000_000_000);\n'
+                     '            log::info!("Generated id {}", id);\n'
+                     '            Some(id.to_string())',
+                     s, count=1, flags=re.S)
           p.write_text(s, encoding='utf-8')
-          print('baked server:', server, '| key set:', bool(key))
+          print('baked server:', server, '| key set:', bool(key), '| random-id patch applied')
         shell: python
 
       - name: Restore bridge files
@@ -584,8 +593,17 @@ jobs:
           if key:
               s = re.sub(r'pub const RS_PUB_KEY: &str = "[^"]*";',
                          'pub const RS_PUB_KEY: &str = "%s";' % key, s)
+          # Random per-install device id instead of MAC-derived (prevents
+          # duplicate IDs on machines that report an identical MAC, e.g. VM
+          # clones / identical virtual adapters). The id is generated once and
+          # stored in the local config, same lifetime as the MAC-derived one.
+          s = re.sub(r'let mut id = 0u32;.*?\} else \{\n                None\n            \}',
+                     'let id = rand::thread_rng().gen_range(100_000_000..1_000_000_000);\n'
+                     '            log::info!("Generated id {}", id);\n'
+                     '            Some(id.to_string())',
+                     s, count=1, flags=re.S)
           p.write_text(s, encoding='utf-8')
-          print('baked server:', server, '| key set:', bool(key))
+          print('baked server:', server, '| key set:', bool(key), '| random-id patch applied')
         shell: python
 
       - name: Install LLVM and Clang
