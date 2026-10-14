@@ -27,6 +27,7 @@ jobs:
           mkdir -p dl
           gh api "repos/${{ github.repository }}/actions/artifacts/11875461799/zip" > dl/single.zip
           gh api "repos/${{ github.repository }}/actions/artifacts/11875052278/zip" > dl/client.zip
+          gh api "repos/${{ github.repository }}/actions/artifacts/11882397108/zip" > dl/viewer.zip
 
       - name: Package
         run: |
@@ -34,6 +35,8 @@ jobs:
           python3 -c "import zipfile; zipfile.ZipFile('dl/single.zip').extractall('dl/single')"
           python3 -c "import zipfile; zipfile.ZipFile('dl/client.zip').extractall('dl/client')"
           cp dl/single/rustdesk-agent.exe out/rustdesk-agent-single.exe
+          python3 -c "import zipfile; zipfile.ZipFile('dl/viewer.zip').extractall('dl/viewer')"
+          cp dl/viewer/rustdesk-agent.exe out/rustdesk-viewer.exe
           python3 -c "import os,zipfile
           src = 'dl/client'
           with zipfile.ZipFile('out/rustdesk-agent-custom-windows-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as z:
