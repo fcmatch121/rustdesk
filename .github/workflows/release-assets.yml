@@ -25,9 +25,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p dl
-          gh api "repos/${{ github.repository }}/actions/artifacts/11875461799/zip" > dl/single.zip
-          gh api "repos/${{ github.repository }}/actions/artifacts/11875052278/zip" > dl/client.zip
-          gh api "repos/${{ github.repository }}/actions/artifacts/11882397108/zip" > dl/viewer.zip
+          gh api "repos/${{ github.repository }}/actions/artifacts/11900730785/zip" > dl/single.zip
+          gh api "repos/${{ github.repository }}/actions/artifacts/11901710945/zip" > dl/client.zip
+          gh api "repos/${{ github.repository }}/actions/artifacts/11902156217/zip" > dl/viewer.zip
 
       - name: Package
         run: |
