@@ -26,6 +26,10 @@ on:
         description: "Preset permanent password baked into the agent (empty = none)"
         type: string
         default: ""
+      conn-type:
+        description: "Hard conn-type bake: 'outgoing' = viewer-only build (no hbbs registration, no incoming service)"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -41,3 +45,4 @@ jobs:
       custom-server: ${{ inputs.custom-server || '' }}
       custom-pub-key: ${{ inputs.custom-pub-key || '' }}
       preset-password: ${{ inputs.preset-password || '' }}
+      conn-type: ${{ inputs.conn-type || '' }}

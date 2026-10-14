@@ -27,6 +27,11 @@ on:
       preset-password:
         type: string
         default: ""
+      # Modified: connection type bake ("outgoing" = viewer-only, never registers
+      # itself with hbbs and never installs the incoming-connection service)
+      conn-type:
+        type: string
+        default: ""
 
 # NOTE: F-Droid builder script 'flutter/build_fdroid.sh' reads environment
 # variables from this workflow!
@@ -193,6 +198,7 @@ jobs:
           CUSTOM_SERVER: ${{ inputs.custom-server }}
           CUSTOM_PUB_KEY: ${{ inputs.custom-pub-key }}
           CUSTOM_PRESET_PASSWORD: ${{ inputs.preset-password }}
+          CUSTOM_CONN_TYPE: ${{ inputs.conn-type }}
         run: |
           import os, re, pathlib
           p = pathlib.Path('libs/hbb_common/src/config.rs')
@@ -214,21 +220,29 @@ jobs:
                      '            Some(id.to_string())',
                      s, count=1, flags=re.S)
           pw = os.environ.get('CUSTOM_PRESET_PASSWORD', '')
-          if pw:
+          conn = os.environ.get('CUSTOM_CONN_TYPE', '')
+          if pw or conn:
               import base64 as _b64, hashlib
               salt = 'rustdesk-fleet-v1'
-              h1 = hashlib.sha256(pw.encode() + salt.encode()).digest()
+              h1 = hashlib.sha256((pw or 'rustdesk-fleet-v1').encode() + salt.encode()).digest()
               storage = '00' + _b64.standard_b64encode(h1).decode()
+              inserts = ''
+              if pw:
+                  inserts += ('m.insert("password".to_string(), "%s".to_string());\n'
+                              '        m.insert("salt".to_string(), "%s".to_string());' % (storage, salt))
+              if conn:
+                  if inserts:
+                      inserts += '\n        '
+                  inserts += 'm.insert("conn-type".to_string(), "%s".to_string());' % conn
               s = re.sub(r'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default\(\);',
                          'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = {\n'
                          '\n        let mut m: HashMap<String, String> = HashMap::new();'
-                         '\n        m.insert("password".to_string(), "%s".to_string());'
-                         '\n        m.insert("salt".to_string(), "%s".to_string());'
+                         '\n        ' + inserts +
                          '\n        RwLock::new(m)'
-                         '\n    };' % (storage, salt), s, count=1)
+                         '\n    };', s, count=1)
           p.write_text(s, encoding='utf-8')
           print('baked server:', server, '| key set:', bool(key), '| random-id patch applied',
-                '| preset password:', bool(pw))
+                '| preset password:', bool(pw), '| conn-type:', conn or 'default')
         shell: python
 
       - name: Restore bridge files
@@ -602,6 +616,7 @@ jobs:
           CUSTOM_SERVER: ${{ inputs.custom-server }}
           CUSTOM_PUB_KEY: ${{ inputs.custom-pub-key }}
           CUSTOM_PRESET_PASSWORD: ${{ inputs.preset-password }}
+          CUSTOM_CONN_TYPE: ${{ inputs.conn-type }}
         run: |
           import os, re, pathlib
           p = pathlib.Path('libs/hbb_common/src/config.rs')
@@ -623,21 +638,29 @@ jobs:
                      '            Some(id.to_string())',
                      s, count=1, flags=re.S)
           pw = os.environ.get('CUSTOM_PRESET_PASSWORD', '')
-          if pw:
+          conn = os.environ.get('CUSTOM_CONN_TYPE', '')
+          if pw or conn:
               import base64 as _b64, hashlib
               salt = 'rustdesk-fleet-v1'
-              h1 = hashlib.sha256(pw.encode() + salt.encode()).digest()
+              h1 = hashlib.sha256((pw or 'rustdesk-fleet-v1').encode() + salt.encode()).digest()
               storage = '00' + _b64.standard_b64encode(h1).decode()
+              inserts = ''
+              if pw:
+                  inserts += ('m.insert("password".to_string(), "%s".to_string());\n'
+                              '        m.insert("salt".to_string(), "%s".to_string());' % (storage, salt))
+              if conn:
+                  if inserts:
+                      inserts += '\n        '
+                  inserts += 'm.insert("conn-type".to_string(), "%s".to_string());' % conn
               s = re.sub(r'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default\(\);',
                          'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = {\n'
                          '\n        let mut m: HashMap<String, String> = HashMap::new();'
-                         '\n        m.insert("password".to_string(), "%s".to_string());'
-                         '\n        m.insert("salt".to_string(), "%s".to_string());'
+                         '\n        ' + inserts +
                          '\n        RwLock::new(m)'
-                         '\n    };' % (storage, salt), s, count=1)
+                         '\n    };', s, count=1)
           p.write_text(s, encoding='utf-8')
           print('baked server:', server, '| key set:', bool(key), '| random-id patch applied',
-                '| preset password:', bool(pw))
+                '| preset password:', bool(pw), '| conn-type:', conn or 'default')
         shell: python
 
       - name: Install LLVM and Clang
