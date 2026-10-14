@@ -22,6 +22,10 @@ on:
         description: "Custom server public key to bake into the agent"
         type: string
         default: ""
+      preset-password:
+        description: "Preset permanent password baked into the agent (empty = none)"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -36,3 +40,4 @@ jobs:
       build-scope: ${{ inputs.build-scope || 'all' }}
       custom-server: ${{ inputs.custom-server || '' }}
       custom-pub-key: ${{ inputs.custom-pub-key || '' }}
+      preset-password: ${{ inputs.preset-password || '' }}

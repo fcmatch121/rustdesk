@@ -23,6 +23,10 @@ on:
       custom-pub-key:
         type: string
         default: ""
+      # Modified: bake a preset permanent password into the agent (empty = none)
+      preset-password:
+        type: string
+        default: ""
 
 # NOTE: F-Droid builder script 'flutter/build_fdroid.sh' reads environment
 # variables from this workflow!
@@ -188,6 +192,7 @@ jobs:
         env:
           CUSTOM_SERVER: ${{ inputs.custom-server }}
           CUSTOM_PUB_KEY: ${{ inputs.custom-pub-key }}
+          CUSTOM_PRESET_PASSWORD: ${{ inputs.preset-password }}
         run: |
           import os, re, pathlib
           p = pathlib.Path('libs/hbb_common/src/config.rs')
@@ -208,8 +213,22 @@ jobs:
                      '            log::info!("Generated id {}", id);\n'
                      '            Some(id.to_string())',
                      s, count=1, flags=re.S)
+          pw = os.environ.get('CUSTOM_PRESET_PASSWORD', '')
+          if pw:
+              import base64 as _b64, hashlib
+              salt = 'rustdesk-fleet-v1'
+              h1 = hashlib.sha256(pw.encode() + salt.encode()).digest()
+              storage = '00' + _b64.standard_b64encode(h1).decode()
+              s = re.sub(r'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default\(\);',
+                         'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = {\n'
+                         '\n        let mut m: HashMap<String, String> = HashMap::new();'
+                         '\n        m.insert("password".to_string(), "%s".to_string());'
+                         '\n        m.insert("salt".to_string(), "%s".to_string());'
+                         '\n        RwLock::new(m)'
+                         '\n    };' % (storage, salt), s, count=1)
           p.write_text(s, encoding='utf-8')
-          print('baked server:', server, '| key set:', bool(key), '| random-id patch applied')
+          print('baked server:', server, '| key set:', bool(key), '| random-id patch applied',
+                '| preset password:', bool(pw))
         shell: python
 
       - name: Restore bridge files
@@ -582,6 +601,7 @@ jobs:
         env:
           CUSTOM_SERVER: ${{ inputs.custom-server }}
           CUSTOM_PUB_KEY: ${{ inputs.custom-pub-key }}
+          CUSTOM_PRESET_PASSWORD: ${{ inputs.preset-password }}
         run: |
           import os, re, pathlib
           p = pathlib.Path('libs/hbb_common/src/config.rs')
@@ -602,8 +622,22 @@ jobs:
                      '            log::info!("Generated id {}", id);\n'
                      '            Some(id.to_string())',
                      s, count=1, flags=re.S)
+          pw = os.environ.get('CUSTOM_PRESET_PASSWORD', '')
+          if pw:
+              import base64 as _b64, hashlib
+              salt = 'rustdesk-fleet-v1'
+              h1 = hashlib.sha256(pw.encode() + salt.encode()).digest()
+              storage = '00' + _b64.standard_b64encode(h1).decode()
+              s = re.sub(r'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = Default::default\(\);',
+                         'pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = {\n'
+                         '\n        let mut m: HashMap<String, String> = HashMap::new();'
+                         '\n        m.insert("password".to_string(), "%s".to_string());'
+                         '\n        m.insert("salt".to_string(), "%s".to_string());'
+                         '\n        RwLock::new(m)'
+                         '\n    };' % (storage, salt), s, count=1)
           p.write_text(s, encoding='utf-8')
-          print('baked server:', server, '| key set:', bool(key), '| random-id patch applied')
+          print('baked server:', server, '| key set:', bool(key), '| random-id patch applied',
+                '| preset password:', bool(pw))
         shell: python
 
       - name: Install LLVM and Clang
