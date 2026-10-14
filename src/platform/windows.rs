@@ -3404,6 +3404,65 @@ pub fn install_service() -> bool {
     std::process::exit(0);
 }
 
+// Modified: silent-agent — plain-launch install for the standalone single exe.
+// install_me()'s install batch XCOPYs the exe's ENTIRE parent folder into the
+// install path (upstream assumes the portable-folder layout); running the
+// single agent binary from an arbitrary folder breaks that copy and leaves
+// the service registered against a missing exe. This lean path copies just
+// the binary and installs the service against it.
+pub fn install_service_portable() {
+    log::info!("Installing service (portable single exe)...");
+    let _installing = crate::platform::InstallingService::new();
+    let cur = match std::env::current_exe() {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Failed to locate current exe: {e}");
+            return;
+        }
+    };
+    let app_name = crate::get_app_name();
+    let install_dir = get_default_install_path();
+    let target = std::path::Path::new(&install_dir).join(format!("{app_name}.exe"));
+    let already_in_place = match (cur.canonicalize(), target.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    };
+    if !already_in_place {
+        if let Err(e) = std::fs::create_dir_all(&install_dir) {
+            log::error!("Failed to create {}: {e}", install_dir);
+            return;
+        }
+        if let Err(e) = std::fs::copy(&cur, &target) {
+            log::error!("Failed to copy agent to {}: {e}", target.display());
+            return;
+        }
+        let subkey = get_subkey(&app_name, false);
+        let _ = run_cmds(
+            format!(
+                "
+                chcp 65001
+                reg add {subkey} /f
+                reg add {subkey} /f /v DisplayName /t REG_SZ /d \"{app_name}\"
+                reg add {subkey} /f /v InstallLocation /t REG_SZ /d \"{install_dir}\"
+            "
+            ),
+            false,
+            "portable_install",
+        );
+    }
+    Config::set_option("stop-service".into(), "".into());
+    let exe = target.to_string_lossy().to_string();
+    let cmds = get_create_service(&exe);
+    crate::ipc::EXIT_RECV_CLOSE.store(false, Ordering::Relaxed);
+    if let Err(err) = run_cmds(cmds, false, "install") {
+        Config::set_option("stop-service".into(), "Y".into());
+        crate::ipc::EXIT_RECV_CLOSE.store(true, Ordering::Relaxed);
+        log::debug!("{err}");
+        return;
+    }
+    std::process::exit(0);
+}
+
 /// Calculate the total size of a directory in KB
 /// Does not follow symlinks to prevent directory traversal attacks.
 fn get_directory_size_kb(path: &str) -> u64 {

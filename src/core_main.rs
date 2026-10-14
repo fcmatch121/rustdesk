@@ -223,11 +223,11 @@ pub fn core_main() -> Option<CoreMainAction> {
             if !crate::platform::is_installed() {
                 if crate::platform::is_elevated(None).unwrap_or(false) {
                     // Already admin: silent install + service, no UAC prompt.
-                    if crate::platform::install_me("", "".to_owned(), true, false).is_ok() {
-                        crate::platform::remove_autostart_run_key();
-                        crate::platform::install_service(); // exits the process on success
-                        return None;
-                    }
+                    // Modified: use the portable single-exe install path —
+                    // install_me() XCOPYs the whole parent folder, which breaks
+                    // when running a standalone exe from an arbitrary folder.
+                    crate::platform::remove_autostart_run_key();
+                    crate::platform::install_service_portable(); // exits the process on success
                     return None;
                 }
                 // No admin rights: skip UAC entirely — per-user autostart
