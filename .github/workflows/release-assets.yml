@@ -1,0 +1,49 @@
+name: Attach release assets
+
+# Modified: attach packaged binaries to a release (uploads.github.com is not
+# reachable from the build sandbox, so a CI run does the uploading instead)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach assets to"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch artifacts from build run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dl
+          gh api "repos/${{ github.repository }}/actions/artifacts/11875461799/zip" > dl/single.zip
+          gh api "repos/${{ github.repository }}/actions/artifacts/11875052278/zip" > dl/client.zip
+
+      - name: Package
+        run: |
+          mkdir -p out
+          python3 -c "import zipfile; zipfile.ZipFile('dl/single.zip').extractall('dl/single')"
+          python3 -c "import zipfile; zipfile.ZipFile('dl/client.zip').extractall('dl/client')"
+          cp dl/single/rustdesk-agent.exe out/rustdesk-agent-single.exe
+          python3 -c "import os,zipfile
+          src = 'dl/client'
+          with zipfile.ZipFile('out/rustdesk-agent-custom-windows-x86_64.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for root, _, files in os.walk(src):
+                  for f in files:
+                      p = os.path.join(root, f)
+                      z.write(p, os.path.relpath(p, src))"
+          cp release-assets/rustdesk-console.zip out/rustdesk-console.zip
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ inputs.tag }}" out/* --repo "${{ github.repository }}" --clobber
